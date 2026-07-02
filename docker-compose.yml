@@ -22,11 +22,11 @@ services:
       POSTGRES_USER: tiktok
       POSTGRES_PASSWORD: tiktok
       POSTGRES_DB: tiktok_reels
-    # Postgres is NOT published to the host by default — the app talks
-    # over the compose network. Uncomment only if you need to connect
-    # from a host tool (psql, pgAdmin, etc.):
-    # ports:
-    #   - "5432:5432"
+    # Published to the host on 5433 so the black-box acceptance suite
+    # (which runs on the CI runner, not inside compose) can connect
+    # directly to truncate tables between test modules.
+    ports:
+      - "5433:5432"
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U tiktok"]
       interval: 5s

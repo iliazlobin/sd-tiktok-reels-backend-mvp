@@ -77,8 +77,8 @@ class CommentService:
                         & (Comment.comment_id > uuid.UUID(cursor_data["id"])),
                     ),
                 )
-            except (ValueError, KeyError):
-                raise ValueError("malformed cursor")
+            except (ValueError, KeyError) as exc:
+                raise ValueError("malformed cursor") from exc
 
         result = await self.session.execute(query.limit(self.PAGE_SIZE + 1))
         comments = result.scalars().all()

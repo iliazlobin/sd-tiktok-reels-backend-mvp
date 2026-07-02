@@ -2,10 +2,13 @@ import json
 import uuid
 from base64 import b64decode, b64encode
 
-from sqlalchemy import func, select, text
+from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
+from sqlalchemy.types import DateTime
 
 from tiktok_reels.models.video import Video
+from tiktok_reels.schemas.common import decode_cursor, encode_cursor
 from tiktok_reels.schemas.feed import FeedItem, UserBriefResponse
 
 
@@ -63,8 +66,8 @@ class FeedService:
                     if vid == cursor_data.get("id"):
                         start_idx = i + 1
                         break
-            except Exception:
-                raise ValueError("malformed cursor")
+            except Exception as exc:
+                raise ValueError("malformed cursor") from exc
 
         page = cached[start_idx : start_idx + self.PAGE_SIZE]
         if not page:
@@ -76,7 +79,7 @@ class FeedService:
             return [], None
 
         result = await self.session.execute(
-            select(Video).where(Video.video_id.in_(video_ids)),
+            select(Video).options(selectinload(Video.author)).where(Video.video_id.in_(video_ids)),
         )
         videos_map = {v.video_id: v for v in result.scalars().all()}
 
@@ -103,47 +106,72 @@ class FeedService:
         self,
         cursor: str | None = None,
     ) -> tuple[list[FeedItem], str | None]:
-        """Compute feed directly from Postgres using the recency-biased formula."""
-        now = func.now()
+        """Compute feed directly from Postgres using the recency-biased formula.
+
+        Scores use a recency-weighted formula (like_count * 10 + comment_count * 5 +
+        recency_bonus).  To keep cursor pagination stable across pages the
+        reference timestamp is **frozen** at the first page's ``now()`` and
+        embedded in the cursor.  Every subsequent page uses the same timestamp
+        so scores don't drift between pages.
+        """
+        cursor_score: float | None = None
+        cursor_vid: uuid.UUID | None = None
+
+        if cursor:
+            cursor_data = decode_cursor(cursor)
+            cursor_score = float(cursor_data["score"])
+            cursor_vid = uuid.UUID(cursor_data["id"])
+            ref_ts = cursor_data.get("ts")
+        else:
+            ref_ts = None
+
+        # Use a stable reference timestamp if this is a follow-up page
+        if ref_ts:
+            now = bindparam("_feed_ref_ts", value=ref_ts, type_=DateTime(timezone=True))
+        else:
+            now = func.now()
+
         score_expr = (
             Video.like_count * 10
             + Video.comment_count * 5
             + (1.0 / (func.extract("epoch", now - Video.created_at) / 3600.0 + 2)) * 1000
         ).label("score")
 
-        query = select(Video, score_expr).order_by(text("score DESC"))
+        query = (
+            select(Video, score_expr)
+            .options(selectinload(Video.author))
+            .order_by(text("score DESC"), Video.video_id.desc())
+        )
 
         if cursor:
+            # The WHERE clause must also use the same reference timestamp so
+            # the cursor threshold is stable.
+            if ref_ts:
+                score_formula = (
+                    "videos.like_count * 10 + videos.comment_count * 5 + "
+                    "(1.0 / (EXTRACT(EPOCH FROM ("
+                    f"'{ref_ts}'::timestamptz - videos.created_at"
+                    ")) / 3600.0 + 2)) * 1000"
+                )
+            else:
+                score_formula = (
+                    "videos.like_count * 10 + videos.comment_count * 5 + "
+                    "(1.0 / (EXTRACT(EPOCH FROM (now() - videos.created_at)) / 3600.0 + 2)) * 1000"
+                )
             try:
-                cursor_data = json.loads(b64decode(cursor.encode()).decode())
                 query = query.where(
                     text(
-                        "score < :cursor_score OR (score = :cursor_score2 AND videos.video_id < :cursor_id)"
-                    )
+                        f"({score_formula}) < :cs "
+                        f"OR (({score_formula}) = :cs AND videos.video_id < :cid)"
+                    ).bindparams(cs=cursor_score, cid=cursor_vid),
                 )
-                # use TextClause for the where condition
-                from sqlalchemy import or_
-
-                score = cursor_data["score"]
-                vid = uuid.UUID(cursor_data["id"])
-                # Simpler approach: use raw sql for the cursor
-                query = (
-                    select(Video, score_expr)
-                    .where(
-                        or_(
-                            score_expr < score,
-                            (score_expr == score) & (Video.video_id < vid),
-                        )
-                    )
-                    .order_by(text("score DESC"))
-                )
-            except Exception:
-                raise ValueError("malformed cursor")
+            except (ValueError, KeyError, TypeError) as exc:
+                raise ValueError("malformed cursor") from exc
 
         result = await self.session.execute(query.limit(self.PAGE_SIZE + 1))
         rows = result.all()
 
-        feed_items = []
+        feed_items: list[FeedItem] = []
         for row in rows:
             video, score = row
             feed_items.append(self._video_to_feed_item(video, score))
@@ -152,14 +180,13 @@ class FeedService:
         if len(feed_items) > self.PAGE_SIZE:
             feed_items = feed_items[: self.PAGE_SIZE]
             last = rows[self.PAGE_SIZE - 1]
-            last_score = float(last[1])
-            next_payload = b64encode(
-                json.dumps(
-                    {"score": last_score, "id": str(last[0].video_id)},
-                    separators=(",", ":"),
-                ).encode()
-            ).decode()
-            next_cursor = next_payload
+            last_video, last_score = last[0], last[1]
+            # Capture a stable timestamp on the first page so follow-up
+            # pagination uses consistent scores.
+            if ref_ts is None and cursor is None:
+                result_ts = await self.session.execute(text("SELECT now()"))
+                ref_ts = result_ts.scalar().isoformat()
+            next_cursor = encode_cursor(float(last_score), last_video.video_id, ts=ref_ts)
 
         return feed_items, next_cursor
 

@@ -14,11 +14,21 @@ class CursorToken(BaseModel):
     id: str = Field(..., description="UUID of the last item")
 
 
-def encode_cursor(score: float | None, item_id: UUID_TYPE) -> str:
-    """Encode a cursor token as base64 JSON."""
+def encode_cursor(score: float | None, item_id: UUID_TYPE, ts: str | None = None) -> str:
+    """Encode a cursor token as base64 JSON.
+
+    Args:
+        score: The score of the last item (for score-based pagination).
+        item_id: UUID of the last item.
+        ts: Stable reference timestamp in ISO format. When set, pagination
+            uses this frozen timestamp to compute consistent scores across
+            pages instead of ``func.now()``.
+    """
     payload: dict[str, str | float] = {"id": str(item_id)}
     if score is not None:
         payload["score"] = float(score)
+    if ts is not None:
+        payload["ts"] = ts
     return b64encode(json.dumps(payload, separators=(",", ":")).encode()).decode()
 
 

@@ -24,7 +24,7 @@ class TestCreateUser:
 
     async def test_duplicate_username_raises(self, user_service):
         await user_service.create_user("alice")
-        with pytest.raises(Exception):  # IntegrityError
+        with pytest.raises(Exception):  # noqa: B017
             await user_service.create_user("alice")
 
 

@@ -24,7 +24,7 @@ class SearchService:
 
         results: list[SearchResult] = []
 
-        if search_type in ("all", "video"):
+        if search_type in ("all", "video", "sound"):
             results.extend(await self._search_videos(query))
 
         if search_type in ("all", "hashtag"):
@@ -37,8 +37,8 @@ class SearchService:
         if cursor:
             try:
                 offset = int(cursor)
-            except (ValueError, TypeError):
-                raise ValueError("malformed cursor")
+            except (ValueError, TypeError) as exc:
+                raise ValueError("malformed cursor") from exc
         else:
             offset = 0
 
@@ -56,7 +56,8 @@ class SearchService:
             FROM videos v
             JOIN users u ON u.user_id = v.author_id
             WHERE
-                to_tsvector('english', v.caption || ' ' || v.sound_name) @@ websearch_to_tsquery('english', :q)
+                to_tsvector('english', v.caption || ' ' || v.sound_name)
+                    @@ websearch_to_tsquery('english', :q)
                 OR v.caption ILIKE '%' || :q2 || '%'
                 OR v.sound_name ILIKE '%' || :q3 || '%'
             ORDER BY v.created_at DESC

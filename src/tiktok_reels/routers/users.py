@@ -20,8 +20,8 @@ async def create_user(
     service = UserService(session)
     try:
         user = await service.create_user(body.username)
-    except IntegrityError:
-        raise HTTPException(status_code=409, detail="username already taken")
+    except IntegrityError as exc:
+        raise HTTPException(status_code=409, detail="username already taken") from exc
     return UserResponse.model_validate(user)
 
 
@@ -49,8 +49,8 @@ async def get_user_videos(
         raise HTTPException(status_code=404, detail="user not found")
     try:
         videos, next_cursor = await service.get_user_videos(user_id, cursor=cursor)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="malformed cursor")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="malformed cursor") from exc
     return {
         "videos": [v.model_dump() for v in videos],
         "next_cursor": next_cursor,

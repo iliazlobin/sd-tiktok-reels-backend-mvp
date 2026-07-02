@@ -21,7 +21,7 @@ async def search(
     service = SearchService(session)
     try:
         results, next_cursor = await service.search(q, search_type=type, cursor=cursor)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="malformed cursor")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="malformed cursor") from exc
 
     return SearchResponse(results=results, next_cursor=next_cursor)

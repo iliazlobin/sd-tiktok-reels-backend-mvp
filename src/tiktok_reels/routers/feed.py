@@ -18,7 +18,7 @@ async def get_feed(
     service = FeedService(session, redis_client=redis)
     try:
         videos, next_cursor = await service.get_feed(cursor=cursor)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="malformed cursor")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="malformed cursor") from exc
 
     return FeedResponse(videos=videos, next_cursor=next_cursor)

@@ -38,7 +38,13 @@ class StreamingService:
 
         lines = [
             '<?xml version="1.0" encoding="utf-8"?>',
-            f'<MPD xmlns="urn:mpeg:dash:schema:mpd:2011" minBufferTime="PT2S" profiles="urn:mpeg:dash:profile:isoff-live:2011" type="static" publishTime="{uuid.uuid4().hex[:8]}">',
+            (
+                f'<MPD xmlns="urn:mpeg:dash:schema:mpd:2011"'
+                f' minBufferTime="PT2S"'
+                f' profiles="urn:mpeg:dash:profile:isoff-live:2011"'
+                f' type="static"'
+                f' publishTime="{uuid.uuid4().hex[:8]}">'
+            ),
             f'  <Period id="1" duration="PT{(sum(s.duration_seconds for s in segments)//1)}S">',
         ]
 
@@ -47,7 +53,8 @@ class StreamingService:
                 quality, 1000000
             )
             lines.append(
-                f'    <AdaptationSet mimeType="video/mp2t" contentType="video" bandwidth="{bandwidth}">'
+                f'    <AdaptationSet mimeType="video/mp2t"'
+                f' contentType="video" bandwidth="{bandwidth}">'
             )
             lines.append(f'      <Representation id="{quality}" bandwidth="{bandwidth}">')
             lines.append(

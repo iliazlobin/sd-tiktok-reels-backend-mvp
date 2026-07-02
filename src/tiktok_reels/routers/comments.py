@@ -24,7 +24,7 @@ async def create_comment(
     try:
         comment = await service.create_comment(video_id, body.user_id, body.text)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return CommentResponse.model_validate(comment)
 
 
@@ -37,7 +37,7 @@ async def list_comments(
     service = CommentService(session)
     try:
         comments, next_cursor = await service.get_comments(video_id, cursor=cursor)
-    except ValueError:
-        raise HTTPException(status_code=400, detail="malformed cursor")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="malformed cursor") from exc
 
     return CommentListResponse(comments=comments, next_cursor=next_cursor)

@@ -22,7 +22,7 @@ async def like_video(
     try:
         liked, count = await service.like_video(video_id, body.user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return LikeResponse(liked=True, like_count=count)
 
 
@@ -37,5 +37,5 @@ async def unlike_video(
     try:
         unliked, count = await service.unlike_video(video_id, body.user_id)
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return LikeResponse(liked=False, like_count=count)

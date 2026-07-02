@@ -31,7 +31,7 @@ async def create_video(
             hashtag_names=body.hashtags,
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     hashtags = await service.get_video_hashtags(video.video_id)
     # Reload with eager relations
@@ -99,5 +99,5 @@ async def add_segments(
             [s.model_dump() for s in body.segments],
         )
     except ValueError as exc:
-        raise HTTPException(status_code=404, detail=str(exc))
+        raise HTTPException(status_code=404, detail=str(exc)) from exc
     return {"video_id": str(video_id), "segment_count": count}

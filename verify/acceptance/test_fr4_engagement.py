@@ -113,7 +113,7 @@ def test_like_unknown_user_404(client):
 def test_post_comment_201(client):
     """Posting a comment returns 201 with comment data."""
     user = create_user(client)
-    author = create_user(client, username="creator")
+    author = create_user(client)
     video = create_video(client, author["user_id"])
 
     body = post_comment(client, video["video_id"], user["user_id"], text="great video!")
@@ -128,7 +128,7 @@ def test_post_comment_201(client):
 def test_list_comments(client):
     """Listing comments returns paginated results."""
     user = create_user(client)
-    author = create_user(client, username="creator")
+    author = create_user(client)
     video = create_video(client, author["user_id"])
 
     c1 = post_comment(client, video["video_id"], user["user_id"], text="first")
@@ -153,7 +153,7 @@ def test_list_comments(client):
 def test_comment_empty_text_422(client):
     """Posting a comment with empty text returns 422."""
     user = create_user(client)
-    author = create_user(client, username="creator")
+    author = create_user(client)
     video = create_video(client, author["user_id"])
 
     r = client.post(
@@ -178,7 +178,7 @@ def test_comment_unknown_video_404(client):
 def test_comment_updates_video_count(client):
     """Comment count on video detail increments after posting."""
     user = create_user(client)
-    author = create_user(client, username="creator")
+    author = create_user(client)
     video = create_video(client, author["user_id"])
 
     post_comment(client, video["video_id"], user["user_id"], text="nice")
@@ -191,7 +191,7 @@ def test_comment_updates_video_count(client):
 def test_comments_cursor_pagination(client):
     """Comment listing supports cursor-based pagination."""
     user = create_user(client)
-    author = create_user(client, username="creator")
+    author = create_user(client)
     video = create_video(client, author["user_id"])
 
     for i in range(3):

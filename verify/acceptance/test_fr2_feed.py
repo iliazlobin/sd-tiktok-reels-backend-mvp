@@ -102,8 +102,8 @@ def test_feed_structure_consistent(client):
     }
 
     for item in body["videos"]:
-        assert required_keys.issubset(
-            item.keys()
-        ), f"Missing keys: {required_keys - set(item.keys())}"
+        assert required_keys.issubset(item.keys()), (
+            f"Missing keys: {required_keys - set(item.keys())}"
+        )
         assert "user_id" in item["author"]
         assert "username" in item["author"]

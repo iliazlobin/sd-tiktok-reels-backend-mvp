@@ -1,6 +1,7 @@
 import json
 import uuid
 from base64 import b64decode, b64encode
+from datetime import datetime
 
 from sqlalchemy import bindparam, func, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -127,7 +128,8 @@ class FeedService:
 
         # Use a stable reference timestamp if this is a follow-up page
         if ref_ts:
-            now = bindparam("_feed_ref_ts", value=ref_ts, type_=DateTime(timezone=True))
+            ref_ts_dt = datetime.fromisoformat(ref_ts)
+            now = bindparam("_feed_ref_ts", value=ref_ts_dt, type_=DateTime(timezone=True))
         else:
             now = func.now()
 

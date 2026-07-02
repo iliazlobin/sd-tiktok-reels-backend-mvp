@@ -45,7 +45,7 @@ class StreamingService:
                 f' type="static"'
                 f' publishTime="{uuid.uuid4().hex[:8]}">'
             ),
-            f'  <Period id="1" duration="PT{(sum(s.duration_seconds for s in segments)//1)}S">',
+            f'  <Period id="1" duration="PT{(sum(s.duration_seconds for s in segments) // 1)}S">',
         ]
 
         for quality, segs in quality_groups.items():

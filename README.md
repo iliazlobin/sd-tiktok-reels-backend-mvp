@@ -1,5 +1,9 @@
 # TikTok/Reels MVP
 
+[![lint](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/lint.yml/badge.svg)](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/lint.yml)
+[![ci](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/ci.yml/badge.svg)](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/ci.yml)
+[![functional](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/functional.yml/badge.svg)](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/functional.yml)
+
 A short-form video backend (TikTok/Reels-style) implementing the core upload → feed → engage → search loop. One FastAPI process backed by PostgreSQL 16 for authoritative state and Redis 7 for feed caching and engagement counters.
 
 **Slug:** `tiktok-reels`  

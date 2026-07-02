@@ -85,6 +85,29 @@ Real GPU video transcoding, ML-based recommendation / two-tower ranking, multi-C
 
 ---
 
+## API Summary
+
+All routes live under `/api/v1` except the health probe. Full request/response shapes are in `src/tiktok_reels/schemas/`.
+
+| Area | Endpoint | Behavior |
+|------|----------|----------|
+| Health | `GET /healthz` | Liveness → `200 {"status":"ok"}` |
+| Users | `POST /api/v1/users` | Create user → `201`; duplicate username → `409` |
+| Users | `GET /api/v1/users/{user_id}` | Profile with follower/following counts; `404` if unknown |
+| Users | `GET /api/v1/users/{user_id}/videos` | Creator catalog, reverse-chronological, cursor-paginated |
+| Users | `POST` / `DELETE /api/v1/users/{followee_id}/follow` | Follow/unfollow, idempotent; self-follow → `422` |
+| Videos | `POST /api/v1/videos` | Publish (metadata + hashtag upsert) → `201`; unknown author → `404` |
+| Videos | `GET /api/v1/videos/{video_id}` | Detail with author, hashtags, engagement counts; `404` if unknown |
+| Videos | `POST /api/v1/videos/{video_id}/segments` | Bulk-register ABR quality segments |
+| Feed | `GET /api/v1/feed` | Trending feed, recency-biased, cursor-paginated (15/page); malformed cursor → `400` |
+| Streaming | `GET /api/v1/videos/{video_id}/manifest` | MPEG-DASH MPD manifest; `404` if no segments |
+| Streaming | `GET /api/v1/segments/{segment_id}` | Segment bytes, `Content-Type: video/mp2t` |
+| Engagement | `POST` / `DELETE /api/v1/videos/{video_id}/like` | Like/unlike, idempotent → `200`, counters update |
+| Engagement | `POST` / `GET /api/v1/videos/{video_id}/comments` | Post (`201`) / list (oldest-first, 20/page cursor) |
+| Search | `GET /api/v1/search?q=&type=` | FTS across videos, hashtags, usernames; `type=all\|video\|hashtag\|user` |
+
+---
+
 ## Data Model
 
 ### Entity Relationship Summary
@@ -283,7 +306,9 @@ A video with 10 likes and 5 comments uploaded 1 hour ago scores: `10*10 + 5*5 + 
 
 ---
 
-## Acceptance Test Coverage Map
+## FR ↔ Acceptance Test Map
+
+Every functional requirement is verified by a dedicated black-box acceptance test in `verify/acceptance/`, run against the live compose stack over HTTP:
 
 | File | FR | Route(s) | Assertions |
 |------|----|----------|------------|
@@ -297,15 +322,39 @@ A video with 10 likes and 5 comments uploaded 1 hour ago scores: `10*10 + 5*5 + 
 
 ---
 
-## CI/CD Pipeline
+## Test Scenarios
 
-Three GitHub Actions workflows (see `.github/workflows/`):
+Two complementary suites cover the system:
 
-| Workflow | Trigger | Steps |
-|----------|---------|-------|
-| `lint.yml` | PR + push to main | Ruff check + format (pinned 0.15.20) |
-| `ci.yml` | PR + push to main | Postgres 16 service container, run 40 unit tests via pytest |
-| `functional.yml` | Push to main | Full compose stack (db + redis + app), migrations, 7 acceptance tests via httpx |
+**Unit / integration tests (`tests/`, 40 tests, SQLite in-memory — no external services):**
+
+- Cursor token round-trip: encode/decode base64 JSON cursors, malformed-input rejection (`test_common.py`)
+- User lifecycle: CRUD, follow/unfollow idempotency, follower/following counter accuracy, creator-catalog cursor pagination (`test_user_service.py`)
+- Video publish: with/without hashtags, hashtag deduplication, unknown-author error, bulk segment insert (`test_video_service.py`)
+- Comments: create, unknown video/user errors, cursor-paginated listing (`test_comment_service.py`)
+- Engagement: like/unlike idempotency, `like_count` increment/decrement accuracy, unknown video/user errors (`test_engagement_service.py`)
+- Streaming: MPD manifest XML generation across quality tiers, empty-segments edge case (`test_streaming_service.py`)
+
+**Black-box acceptance tests (`verify/acceptance/`, 7 files — httpx against the running compose stack):**
+
+- One test file per FR plus health, mapped in the FR ↔ Acceptance Test Map above
+- Exercise the real HTTP surface end-to-end: Postgres FTS queries, Redis-cached feed, DASH manifest serving, idempotent engagement writes, cursor pagination across disjoint pages, and error contracts (`400` malformed cursor, `404` unknown entities, `422` validation failures)
+
+---
+
+## Test Results
+
+Three GitHub Actions workflows gate the repo; each runs on every push and pull request, plus a daily scheduled run:
+
+[![lint](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/lint.yml/badge.svg)](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/lint.yml)
+[![ci](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/ci.yml/badge.svg)](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/ci.yml)
+[![functional](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/functional.yml/badge.svg)](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/functional.yml)
+
+| Workflow | Live results | What it runs |
+|----------|--------------|--------------|
+| `lint.yml` | [lint runs](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/lint.yml) | Ruff check + format (pinned 0.15.20) over `src/`, `tests/`, `verify/` |
+| `ci.yml` | [ci runs](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/ci.yml) | Postgres 16 service container, 40 unit tests via pytest, Docker image build |
+| `functional.yml` | [functional runs](https://github.com/iliazlobin/sd-tiktok-reels-backend-mvp/actions/workflows/functional.yml) | Full compose stack (db + redis + app), migrations, 7 acceptance test files via httpx |
 
 ---
 

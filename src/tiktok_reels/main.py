@@ -3,17 +3,14 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
-from tiktok_reels.database import engine
-from tiktok_reels.models.base import Base
 from tiktok_reels.redis import close_redis
 from tiktok_reels.routers import routers
 
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncIterator[None]:
-    # Create tables on startup (idempotent — safe for production)
-    async with engine.begin() as conn:
-        await conn.run_sync(Base.metadata.create_all)
+    # Schema is owned by Alembic (`alembic upgrade head` in CI/deploy); do NOT create_all here —
+    # it races the migration step and raises DuplicateTableError ("relation ... already exists").
     yield
     await close_redis()
 

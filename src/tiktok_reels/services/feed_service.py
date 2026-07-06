@@ -139,36 +139,37 @@ class FeedService:
             + (1.0 / (func.extract("epoch", now - Video.created_at) / 3600.0 + 2)) * 1000
         ).label("score")
 
+        # Build the ORDER BY formula text early so BOTH ORDER BY and WHERE use
+        # identical SQL expressions. This eliminates floating-point precision drift
+        # between the SELECT-computed alias and the WHERE-clause recomputation,
+        # which caused overlapping pages when all items had identical scores.
+        if ref_ts:
+            order_formula = (
+                "videos.like_count * 10 + videos.comment_count * 5 + "
+                "(1.0 / (EXTRACT(EPOCH FROM ("
+                f"'{ref_ts}'::timestamptz - videos.created_at"
+                ")) / 3600.0 + 2)) * 1000"
+            )
+        else:
+            order_formula = (
+                "videos.like_count * 10 + videos.comment_count * 5 + "
+                "(1.0 / (EXTRACT(EPOCH FROM (now() - videos.created_at)) / 3600.0 + 2)) * 1000"
+            )
+
         query = (
             select(Video, score_expr)
             .options(selectinload(Video.author))
-            .order_by(text("score DESC"), Video.video_id.desc())
+            .order_by(text(f"({order_formula}) DESC"), Video.video_id.desc())
         )
 
         if cursor:
-            # The WHERE clause must also use the same reference timestamp so
-            # the cursor threshold is stable.
-            if ref_ts:
-                score_formula = (
-                    "videos.like_count * 10 + videos.comment_count * 5 + "
-                    "(1.0 / (EXTRACT(EPOCH FROM ("
-                    f"'{ref_ts}'::timestamptz - videos.created_at"
-                    ")) / 3600.0 + 2)) * 1000"
-                )
-            else:
-                score_formula = (
-                    "videos.like_count * 10 + videos.comment_count * 5 + "
-                    "(1.0 / (EXTRACT(EPOCH FROM (now() - videos.created_at)) / 3600.0 + 2)) * 1000"
-                )
+            # Use the same formula as the ORDER BY — single source of truth,
+            # no floating-point drift between the two expressions.
             try:
-                # Use a PostgreSQL ROW constructor for atomic composite comparison.
-                # This avoids floating-point precision drift between the ORDER BY
-                # expression (alias) and the WHERE clause (recomputed) that can happen
-                # when comparing score and video_id as separate predicates.
                 query = query.where(
                     text(
-                        f"ROW({score_formula}, videos.video_id) "
-                        "< ROW(:cs, :cid::uuid)"
+                        f"({order_formula}) < :cs "
+                        f"OR (({order_formula}) = :cs AND videos.video_id < :cid::uuid)"
                     ).bindparams(cs=cursor_score, cid=cursor_vid),
                 )
             except (ValueError, KeyError, TypeError) as exc:

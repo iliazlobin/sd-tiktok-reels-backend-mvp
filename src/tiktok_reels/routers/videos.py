@@ -36,6 +36,7 @@ async def create_video(
     hashtags = await service.get_video_hashtags(video.video_id)
     # Reload with eager relations
     await session.refresh(video)
+    await session.commit()
 
     return VideoResponse(
         video_id=video.video_id,
@@ -100,4 +101,5 @@ async def add_segments(
         )
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    await session.commit()
     return {"video_id": str(video_id), "segment_count": count}

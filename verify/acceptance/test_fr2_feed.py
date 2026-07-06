@@ -15,7 +15,6 @@ from verify.acceptance.conftest import (
 )
 
 
-
 def test_feed_returns_videos(client):
     """Feed endpoint returns a list of videos with expected structure."""
     user = create_user(client)

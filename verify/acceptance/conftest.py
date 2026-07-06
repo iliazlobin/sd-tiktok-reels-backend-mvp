@@ -24,7 +24,6 @@ def base_url():
     return API_BASE_URL
 
 
-
 @pytest.fixture(scope="session")
 def client(base_url):
     """Session-scoped httpx client for the entire acceptance run."""

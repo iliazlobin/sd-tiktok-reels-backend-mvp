@@ -53,7 +53,7 @@ jobs:
 
       - name: Install test deps
         run: |
-          pip install pytest httpx psycopg2-binary
+          pip install pytest httpx
 
       - name: Acceptance tests
         run: |

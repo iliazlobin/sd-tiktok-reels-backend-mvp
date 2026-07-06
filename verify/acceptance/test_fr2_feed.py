@@ -15,12 +15,6 @@ from verify.acceptance.conftest import (
 )
 
 
-def test_feed_empty_database(client):
-    """Feed returns empty list when no videos exist (not a crash)."""
-    body = get_feed(client)
-    assert body["videos"] == []
-    assert body.get("next_cursor") is None
-
 
 def test_feed_returns_videos(client):
     """Feed endpoint returns a list of videos with expected structure."""

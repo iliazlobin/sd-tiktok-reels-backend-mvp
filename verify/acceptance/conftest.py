@@ -13,28 +13,6 @@ import pytest
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
 
-# ---------------------------------------------------------------------------
-# DB cleanup for feed empty-database test (runs after FR1 creates videos)
-# ---------------------------------------------------------------------------
-DATABASE_URL = os.environ.get(
-    "DATABASE_URL",
-    "postgresql://tiktok:tiktok@localhost:5433/tiktok_reels",
-).replace("+asyncpg", "")
-
-
-def _truncate_videos() -> None:
-    """Truncate all video-related tables so feed tests see an empty state."""
-    try:
-        import psycopg2
-
-        conn = psycopg2.connect(DATABASE_URL)
-        conn.autocommit = True
-        cur = conn.cursor()
-        cur.execute("TRUNCATE video_segments, likes, comments, video_hashtags, videos CASCADE")
-        conn.close()
-    except Exception:
-        pass  # best-effort; tests use unique ids otherwise
-
 
 # ---------------------------------------------------------------------------
 # Fixtures
@@ -44,15 +22,6 @@ def _truncate_videos() -> None:
 @pytest.fixture(scope="session")
 def base_url():
     return API_BASE_URL
-
-
-@pytest.fixture(scope="module", autouse=True)
-def _clean_for_feed_tests(request):
-    """Truncate videos before the feed test module so test_feed_empty_database
-    sees a clean state despite FR1 tests having created videos earlier."""
-    if "test_fr2_feed" in request.module.__name__:
-        _truncate_videos()
-    yield
 
 
 @pytest.fixture(scope="session")

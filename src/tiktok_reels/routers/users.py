@@ -22,6 +22,7 @@ async def create_user(
         user = await service.create_user(body.username)
     except IntegrityError as exc:
         raise HTTPException(status_code=409, detail="username already taken") from exc
+    await session.commit()
     return UserResponse.model_validate(user)
 
 
@@ -73,6 +74,7 @@ async def follow_user(
     if not follower:
         raise HTTPException(status_code=404, detail="follower not found")
     await service.follow(follower_id, followee_id)
+    await session.commit()
     return FollowResponse(status="following")
 
 
@@ -92,4 +94,5 @@ async def unfollow_user(
     if not follower:
         raise HTTPException(status_code=404, detail="follower not found")
     await service.unfollow(follower_id, followee_id)
+    await session.commit()
     return FollowResponse(status="unfollowed")

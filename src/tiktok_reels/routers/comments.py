@@ -25,6 +25,7 @@ async def create_comment(
         comment = await service.create_comment(video_id, body.user_id, body.text)
     except ValueError as exc:
         raise HTTPException(status_code=404, detail=str(exc)) from exc
+    await session.commit()
     return CommentResponse.model_validate(comment)
 
 

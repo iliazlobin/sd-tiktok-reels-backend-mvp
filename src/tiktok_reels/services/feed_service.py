@@ -161,10 +161,14 @@ class FeedService:
                     "(1.0 / (EXTRACT(EPOCH FROM (now() - videos.created_at)) / 3600.0 + 2)) * 1000"
                 )
             try:
+                # Use a PostgreSQL ROW constructor for atomic composite comparison.
+                # This avoids floating-point precision drift between the ORDER BY
+                # expression (alias) and the WHERE clause (recomputed) that can happen
+                # when comparing score and video_id as separate predicates.
                 query = query.where(
                     text(
-                        f"({score_formula}) < :cs "
-                        f"OR (({score_formula}) = :cs AND videos.video_id < :cid)"
+                        f"ROW({score_formula}, videos.video_id) "
+                        "< ROW(:cs, :cid::uuid)"
                     ).bindparams(cs=cursor_score, cid=cursor_vid),
                 )
             except (ValueError, KeyError, TypeError) as exc:

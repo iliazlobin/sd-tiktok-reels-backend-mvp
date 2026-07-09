@@ -147,14 +147,14 @@ class FeedService:
         if ref_ts:
             score_formula = (
                 "videos.like_count * 10 + videos.comment_count * 5 + "
-                "(1.0 / (EXTRACT(EPOCH FROM ("
+                "CAST((1.0 / (EXTRACT(EPOCH FROM ("
                 f"'{ref_ts}'::timestamptz - videos.created_at"
-                ")) / 3600.0 + 2)) * 1000"
+                ")) / CAST(3600.0 AS FLOAT) + 2)) AS FLOAT) * 1000"
             )
         else:
             score_formula = (
                 "videos.like_count * 10 + videos.comment_count * 5 + "
-                "(1.0 / (EXTRACT(EPOCH FROM (now() - videos.created_at)) / 3600.0 + 2)) * 1000"
+                "CAST((1.0 / (EXTRACT(EPOCH FROM (now() - videos.created_at)) / CAST(3600.0 AS FLOAT) + 2)) AS FLOAT) * 1000"
             )
 
         query = (
